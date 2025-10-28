@@ -110,6 +110,7 @@ export const AppForm = ({
       filepath: initialFilepath,
       conda_env: '',
       custom_command: '',
+      skip_conda: false,
       profile: '',
       profile_image: '',
       is_public: false,
@@ -158,6 +159,7 @@ export const AppForm = ({
       filepath: '',
       conda_env: '',
       custom_command: '',
+      skip_conda: false,
       profile: '',
       profile_image: '',
       is_public: false,
@@ -1201,6 +1203,38 @@ export const AppForm = ({
                 </FormControl>
               )}
             />
+            {currentFramework === 'custom' && (
+              <Controller
+                name="skip_conda"
+                control={control}
+                defaultValue={false}
+                render={({ field }) => (
+                  <FormControl component="fieldset" sx={{ mt: 2 }}>
+                    <FormLabel component="legend" sx={{ fontSize: '0.875rem', color: 'rgba(0, 0, 0, 0.6)' }}>
+                      Environment Settings
+                    </FormLabel>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          {...field}
+                          checked={field.value || false}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2">
+                          Skip conda environment (run with system bash)
+                        </Typography>
+                      }
+                    />
+                    <FormHelperText>
+                      Run this command directly in bash without activating any conda environment
+                    </FormHelperText>
+                  </FormControl>
+                )}
+              />
+            )}
           ) : (
             <></>
           )}

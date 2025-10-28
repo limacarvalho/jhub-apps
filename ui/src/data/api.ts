@@ -74,6 +74,7 @@ export const app: AppQueryGetProps = {
     filepath: '',
     framework: 'panel',
     custom_command: '',
+    skip_conda: false,
     conda_env: '',
     profile: '',
     env: null,

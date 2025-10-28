@@ -16,6 +16,7 @@ export interface UserOptions {
   filepath: string;
   framework: string;
   custom_command: string;
+  skip_conda: boolean;
   conda_env: string;
   profile: string;
   profile_image?: string;

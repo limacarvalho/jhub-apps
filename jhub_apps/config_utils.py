@@ -9,8 +9,7 @@ from jhub_apps.service.models import StartupApp, AdditionalService
 
 
 # jhub-app-proxy configuration constants
-DEFAULT_JHUB_APP_PROXY_VERSION = "v0.2.2-rc5"
-
+DEFAULT_JHUB_APP_PROXY_VERSION = "v0.2.2-rc6-sdscustom"
 
 class PydanticModelTrait(TraitType):
     """A trait type for validating Pydantic models.
