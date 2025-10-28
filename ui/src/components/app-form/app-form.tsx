@@ -3,6 +3,7 @@ import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -11,6 +12,7 @@ import {
   FormControl,
   FormControlLabel,
   FormHelperText,
+  FormLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -92,6 +94,7 @@ export const AppForm = ({
 
   const [error, setError] = useState<string | null>(null); // Store validation errors
   const [shouldValidate, setShouldValidate] = useState(false); // To control validation trigger
+  const [showCustomCommandDialog, setShowCustomCommandDialog] = useState(false); // State for Custom Command guidance dialog
   const repoUrlRef = useRef<HTMLInputElement>(null); // Ref for Git Repository URL field
   const {
     control,
@@ -390,6 +393,13 @@ export const AppForm = ({
   });
 
   const currentFramework = watch('framework');
+
+  // Show custom command dialog when custom framework is selected
+  useEffect(() => {
+    if (currentFramework === 'custom') {
+      setShowCustomCommandDialog(true);
+    }
+  }, [currentFramework]);
 
   useEffect(() => {
     const currentTextAreaRef = textAreaRef.current;
@@ -1320,22 +1330,24 @@ export const AppForm = ({
           ) : (
             <></>
           )}
-          <Controller
-            name="filepath"
-            control={control}
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            render={({ field: { ref, ...field } }) => (
-              <FormControl>
-                <TextField
-                  {...field}
-                  id="filepath"
-                  label="File path"
-                  placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
-                  error={!!errors.filepath}
-                />
-              </FormControl>
-            )}
-          />
+          {currentFramework !== 'custom' && (
+            <Controller
+              name="filepath"
+              control={control}
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              render={({ field: { ref, ...field } }) => (
+                <FormControl>
+                  <TextField
+                    {...field}
+                    id="filepath"
+                    label="File path"
+                    placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
+                    error={!!errors.filepath}
+                  />
+                </FormControl>
+              )}
+            />
+          )}
           <Box
             sx={{
               display: 'flex',
@@ -1474,6 +1486,40 @@ export const AppForm = ({
             </Button>
           </div>
         </div>
+
+        {/* Custom Command Guidance Dialog */}
+        <Dialog open={showCustomCommandDialog} onClose={() => setShowCustomCommandDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            <Box display="flex" alignItems="center">
+              <InfoRoundedIcon sx={{ mr: 1, color: '#1976d2' }} />
+              Custom Command Guidelines
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" paragraph>
+              When using Custom Command, please remember:
+            </Typography>
+            <Typography variant="body2" component="div">
+              <ul>
+                <li>
+                  <strong>Port Placeholder:</strong> Any TCP/IP port in your command should be replaced with <code>{'{port}'}</code>
+                </li>
+                <li>
+                  <strong>Example:</strong> <code>cd /home/user1/app1 && uv run main.py --port {port}</code>
+                </li>
+              </ul>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              The <code>{'{port}'}</code> placeholder will be automatically replaced with the assigned port number when your app starts.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowCustomCommandDialog(false)} variant="contained" color="primary">
+              Got it
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Dialog open={openModal} onClose={() => setOpenModal(false)}>
           <DialogTitle>Error</DialogTitle>
           <DialogContent>
