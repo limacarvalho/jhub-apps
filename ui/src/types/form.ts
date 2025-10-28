@@ -8,6 +8,7 @@ export interface FormInput {
 export interface AppFormInput {
   conda_env?: string;
   custom_command?: string;
+  skip_conda?: boolean;
   description?: string;
   display_name: string;
   env?: string;
@@ -45,6 +46,7 @@ export interface RepoData {
   filepath: string;
   framework: string;
   custom_command: string;
+  skip_conda: boolean;
   conda_project_yml: string;
   env: {
     conda_env: string;

@@ -19,7 +19,7 @@ from jhub_apps.spawner.env import parse_proxy_args_from_env, merge_proxy_args
 logger = structlog.get_logger(__name__)
 
 # jhub-app-proxy configuration
-JHUB_APP_PROXY_INSTALL_URL = "https://raw.githubusercontent.com/nebari-dev/jhub-app-proxy/main/install.sh"
+JHUB_APP_PROXY_INSTALL_URL = "https://raw.githubusercontent.com/limacarvalho/jhub-app-proxy/main/install.sh"
 
 
 def get_proxy_version(config, app_env=None):
@@ -105,11 +105,27 @@ def subclass_spawner(base_spawner):
             custom_cmd = self.user_options.get("custom_command")
             if framework == Framework.custom.value:
                 assert custom_cmd
-                # Custom commands can be any executable - use the command as-is
-                command = Command(args=[
-                    TString("--conda-env=$conda_env"),
-                    "--",
-                ] + custom_cmd.split())
+                # Custom commands can be any executable or bash command
+                # Use bash -c to properly handle complex bash commands with pipes, redirects, etc.
+                skip_conda = self.user_options.get("skip_conda", False)
+
+                if skip_conda:
+                    # Run command without conda environment
+                    command = Command(args=[
+                        "--",
+                        "bash",
+                        "-c",
+                        custom_cmd
+                    ])
+                else:
+                    # Run command within conda environment
+                    command = Command(args=[
+                        TString("--conda-env=$conda_env"),
+                        "--",
+                        "bash",
+                        "-c",
+                        custom_cmd
+                    ])
             else:
                 command: Command = COMMANDS.get(framework)
 

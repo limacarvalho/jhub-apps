@@ -68,6 +68,8 @@ class JHubAppConfig(BaseModel):
     filepath: typing.Optional[str] = str()
     framework: str = "panel"
     custom_command: typing.Optional[str] = str()
+    # For custom commands, skip conda environment activation
+    skip_conda: typing.Optional[bool] = False
     # Make app available to public (unauthenticated Hub users)
     public: typing.Optional[bool] = False
     # Keep app alive, even when there is no activity
