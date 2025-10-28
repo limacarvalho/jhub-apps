@@ -3,6 +3,7 @@ import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -11,6 +12,7 @@ import {
   FormControl,
   FormControlLabel,
   FormHelperText,
+  FormLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -92,6 +94,7 @@ export const AppForm = ({
 
   const [error, setError] = useState<string | null>(null); // Store validation errors
   const [shouldValidate, setShouldValidate] = useState(false); // To control validation trigger
+  const [showCustomCommandDialog, setShowCustomCommandDialog] = useState(false); // State for Custom Command guidance dialog
   const repoUrlRef = useRef<HTMLInputElement>(null); // Ref for Git Repository URL field
   const {
     control,
@@ -391,6 +394,13 @@ export const AppForm = ({
 
   const currentFramework = watch('framework');
 
+  // Show custom command dialog when custom framework is selected
+  useEffect(() => {
+    if (currentFramework === 'custom') {
+      setShowCustomCommandDialog(true);
+    }
+  }, [currentFramework]);
+
   useEffect(() => {
     const currentTextAreaRef = textAreaRef.current;
     const syncScroll = () => {
@@ -445,6 +455,7 @@ export const AppForm = ({
     custom_command,
     profile,
     profile_image,
+    skip_conda,
   }) => {
     setIsProcessing(true);
     const displayName = getFriendlyDisplayName(display_name);
@@ -461,6 +472,7 @@ export const AppForm = ({
         custom_command,
         profile,
         profile_image,
+        skip_conda: skip_conda || false,
         is_public: isPublic,
         share_with: {
           users: currentUserPermissions,
@@ -494,6 +506,7 @@ export const AppForm = ({
           env: getFriendlyEnvironmentVariables(variables),
           custom_command: custom_command || '',
           profile: profile || '',
+          skip_conda: skip_conda || false,
           public: isPublic,
           share_with: {
             users: currentUserPermissions,
@@ -1124,93 +1137,96 @@ export const AppForm = ({
               </FormControl>
             )}
           />
-          {currentFramework === 'custom' ? (
-            <Controller
-              name="custom_command"
-              control={control}
-              rules={{ required: true }}
-              render={({ field: { ref, ...field } }) => (
-                <FormControl
-                  error={!!errors.custom_command}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    mb: 3,
-                  }}
-                >
-                  {errors.custom_command && (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      color="error.main"
-                      mb={2}
-                    >
-                      <ErrorRoundedIcon fontSize="small" />
-                      <Typography variant="body2" color="error" ml={1}>
-                        Enter a custom command
-                      </Typography>
-                    </Box>
-                  )}
-                  <TextField
-                    {...field}
-                    id="custom_command"
-                    label="*Custom Command"
-                    placeholder="Enter custom command"
-                    inputRef={(e) => {
-                      ref(e);
-                      if (errors.custom_command) {
-                        firstErrorRef.current = e;
-                      }
-                    }}
-                    autoFocus={!!errors.custom_command}
+          {currentFramework === 'custom' && (
+            <>
+              <Controller
+                name="custom_command"
+                control={control}
+                rules={{ required: true }}
+                render={({ field: { ref, ...field } }) => (
+                  <FormControl
                     error={!!errors.custom_command}
-                    inputProps={{ maxLength: 255 }}
-                    helperText={
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          color: errors.custom_command
-                            ? 'error'
-                            : 'textSecondary',
-                        }}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      mb: 3,
+                    }}
+                  >
+                    {errors.custom_command && (
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        color="error.main"
+                        mb={2}
                       >
-                        *Required
-                      </span>
-                    }
-                    InputProps={{
-                      style: errors.custom_command
-                        ? { borderColor: '#d32f2f' }
-                        : {},
-                    }}
-                    InputLabelProps={{
-                      style: {
-                        fontSize: '1rem',
-                        transform: 'translate(14px, -6px) scale(0.75)', // Keep label position fixed
-                        color: errors.custom_command
-                          ? '#d32f2f'
-                          : 'rgba(0, 0, 0, 0.54)', // Conditional color
-                        top: '-3px', // Adjust top for error state if needed
-                        position: 'absolute',
-                        pointerEvents: 'none',
-                        transition: 'color 0.3s ease', // Smooth transition for color
-                        // fontWeight: errors.custom_command ? 'bold' : 'normal',
-                      },
-                      shrink: true,
-                    }}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                  />
-                </FormControl>
-              )}
-            />
-            {currentFramework === 'custom' && (
+                        <ErrorRoundedIcon fontSize="small" />
+                        <Typography variant="body2" color="error" ml={1}>
+                          Enter a custom command
+                        </Typography>
+                      </Box>
+                    )}
+                    <TextField
+                      {...field}
+                      id="custom_command"
+                      label="*Custom Command"
+                      placeholder="Enter custom command"
+                      inputRef={(e) => {
+                        ref(e);
+                        if (errors.custom_command) {
+                          firstErrorRef.current = e;
+                        }
+                      }}
+                      autoFocus={!!errors.custom_command}
+                      error={!!errors.custom_command}
+                      inputProps={{ maxLength: 255 }}
+                      helperText={
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            color: errors.custom_command
+                              ? 'error'
+                              : 'textSecondary',
+                          }}
+                        >
+                          *Required
+                        </span>
+                      }
+                      InputProps={{
+                        style: errors.custom_command
+                          ? { borderColor: '#d32f2f' }
+                          : {},
+                      }}
+                      InputLabelProps={{
+                        style: {
+                          fontSize: '1rem',
+                          transform: 'translate(14px, -6px) scale(0.75)', // Keep label position fixed
+                          color: errors.custom_command
+                            ? '#d32f2f'
+                            : 'rgba(0, 0, 0, 0.54)', // Conditional color
+                          top: '-3px', // Adjust top for error state if needed
+                          position: 'absolute',
+                          pointerEvents: 'none',
+                          transition: 'color 0.3s ease', // Smooth transition for color
+                          // fontWeight: errors.custom_command ? 'bold' : 'normal',
+                        },
+                        shrink: true,
+                      }}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                    />
+                  </FormControl>
+                )}
+              />
               <Controller
                 name="skip_conda"
                 control={control}
                 defaultValue={false}
                 render={({ field }) => (
                   <FormControl component="fieldset" sx={{ mt: 2 }}>
-                    <FormLabel component="legend" sx={{ fontSize: '0.875rem', color: 'rgba(0, 0, 0, 0.6)' }}>
+                    <FormLabel
+                      component="legend"
+                      sx={{ fontSize: '0.875rem', color: 'rgba(0, 0, 0, 0.6)' }}
+                    >
                       Environment Settings
                     </FormLabel>
                     <FormControlLabel
@@ -1229,14 +1245,13 @@ export const AppForm = ({
                       }
                     />
                     <FormHelperText>
-                      Run this command directly in bash without activating any conda environment
+                      Run this command directly in bash without activating any
+                      conda environment
                     </FormHelperText>
                   </FormControl>
                 )}
               />
-            )}
-          ) : (
-            <></>
+            </>
           )}
           {environments && environments.length > 0 ? (
             <Controller
@@ -1320,22 +1335,24 @@ export const AppForm = ({
           ) : (
             <></>
           )}
-          <Controller
-            name="filepath"
-            control={control}
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            render={({ field: { ref, ...field } }) => (
-              <FormControl>
-                <TextField
-                  {...field}
-                  id="filepath"
-                  label="File path"
-                  placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
-                  error={!!errors.filepath}
-                />
-              </FormControl>
-            )}
-          />
+          {currentFramework !== 'custom' && (
+            <Controller
+              name="filepath"
+              control={control}
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              render={({ field: { ref, ...field } }) => (
+                <FormControl>
+                  <TextField
+                    {...field}
+                    id="filepath"
+                    label="File path"
+                    placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
+                    error={!!errors.filepath}
+                  />
+                </FormControl>
+              )}
+            />
+          )}
           <Box
             sx={{
               display: 'flex',
@@ -1474,6 +1491,54 @@ export const AppForm = ({
             </Button>
           </div>
         </div>
+
+        {/* Custom Command Guidance Dialog */}
+        <Dialog
+          open={showCustomCommandDialog}
+          onClose={() => setShowCustomCommandDialog(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box display="flex" alignItems="center">
+              <InfoRoundedIcon sx={{ mr: 1, color: '#1976d2' }} />
+              Custom Command Guidelines
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" paragraph>
+              When using Custom Command, please remember:
+            </Typography>
+            <Typography variant="body2" component="div">
+              <ul>
+                <li>
+                  <strong>Port Placeholder:</strong> Any TCP/IP port in your
+                  command should be replaced with <code>{'{port}'}</code>
+                </li>
+                <li>
+                  <strong>Example:</strong>{' '}
+                  <code>
+                    cd /home/user1/app1 && uv run main.py --port {'{port}'}
+                  </code>
+                </li>
+              </ul>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              The <code>{'{port}'}</code> placeholder will be automatically
+              replaced with the assigned port number when your app starts.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setShowCustomCommandDialog(false)}
+              variant="contained"
+              color="primary"
+            >
+              Got it
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Dialog open={openModal} onClose={() => setOpenModal(false)}>
           <DialogTitle>Error</DialogTitle>
           <DialogContent>

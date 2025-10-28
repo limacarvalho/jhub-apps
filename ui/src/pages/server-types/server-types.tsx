@@ -127,6 +127,7 @@ export const ServerTypes = (): React.ReactElement => {
         custom_command: currentFormInput?.custom_command || '',
         profile: currentFormInput?.profile || '',
         profile_image: currentFormInput?.profile_image || '',
+        skip_conda: currentFormInput?.skip_conda || false,
         public: currentFormInput?.is_public || false,
         share_with: {
           users: currentFormInput?.share_with?.users || [],

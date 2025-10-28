@@ -37,6 +37,7 @@
     "@testing-library/jest-dom": "6.9.0",
     "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "14.6.1",
+    "@types/node": "^24.9.2",
     "@types/react": "18.2.17",
     "@types/react-dom": "18.2.7",
     "@vitejs/plugin-react": "5.0.4",
@@ -60,7 +61,7 @@
     "vitest": "^3.0.4"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.24.0",
-    "@esbuild/linux-x64": "0.24.0"
+    "@esbuild/linux-x64": "0.24.0",
+    "@rollup/rollup-linux-x64-gnu": "4.24.0"
   }
 }
