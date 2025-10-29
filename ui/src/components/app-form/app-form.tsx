@@ -1253,7 +1253,9 @@ export const AppForm = ({
               />
             </>
           )}
-          {environments && environments.length > 0 ? (
+          {environments &&
+          environments.length > 0 &&
+          currentFramework !== 'custom' ? (
             <Controller
               name="conda_env"
               control={control}
