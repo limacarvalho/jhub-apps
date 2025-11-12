@@ -1,6 +1,7 @@
 import json
 import os
 
+import structlog
 from fastapi import HTTPException, Security, status
 from fastapi.security import OAuth2AuthorizationCodeBearer, APIKeyCookie
 from fastapi.security.api_key import APIKeyQuery
@@ -9,6 +10,8 @@ from jhub_apps.hub_client.hub_client import get_users_and_group_allowed_to_share
 from .auth import _get_jhub_token_from_jwt_token
 from .client import get_client
 from .models import User
+
+logger = structlog.get_logger(__name__)
 
 ### Endpoints can require authentication using Depends(get_current_user)
 ### get_current_user will look for a token in url params or
@@ -63,15 +66,17 @@ async def get_current_user(
         headers = {"Authorization": f"Bearer {token}"}
         resp = await client.get(endpoint, headers=headers)
         if resp.is_error:
+            # Log sensitive information securely (not in response)
+            logger.error(
+                "Failed to get user info from token",
+                request_url=str(resp.request.url),
+                response_code=resp.status_code,
+                # Only log token hash for security
+                token_hash=hash(token) if token else None
+            )
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
-                detail={
-                    "msg": "Error getting user info from token",
-                    "request_url": str(resp.request.url),
-                    "token": token,
-                    "response_code": resp.status_code,
-                    "hub_response": resp.json(),
-                },
+                detail="Authentication failed. Please try logging in again.",
             )
     user = User(**resp.json())
     if is_jupyterhub_5():
@@ -79,12 +84,14 @@ async def get_current_user(
     if any(scope in user.scopes for scope in access_scopes):
         return user
     else:
+        # Log authorization failure securely
+        logger.warning(
+            "User not authorized",
+            username=user.name,
+            user_scopes=user.scopes,
+            required_scopes=access_scopes
+        )
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail={
-                "msg": f"User not authorized: {user.name}",
-                "request_url": str(resp.request.url),
-                "token": token,
-                "user": resp.json(),
-            },
+            detail=f"User '{user.name}' is not authorized to access this service.",
         )

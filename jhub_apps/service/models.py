@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 # https://jupyterhub.readthedocs.io/en/stable/_static/rest-api/index.html
 class Server(BaseModel):
@@ -89,6 +89,23 @@ class UserOptions(JHubAppConfig):
 class ServerCreation(BaseModel):
     servername: str
     user_options: UserOptions
+
+    @field_validator('servername')
+    @classmethod
+    def validate_servername(cls, v: str) -> str:
+        """Validate server name before normalization"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Server name cannot be empty')
+
+        # Check maximum length (accounting for UTF-8 encoding)
+        if len(v.encode('utf-8')) > 255:
+            raise ValueError('Server name too long (max 255 bytes)')
+
+        # Check for excessively long strings before encoding
+        if len(v) > 500:
+            raise ValueError('Server name too long (max 500 characters)')
+
+        return v
 
     @property
     def normalized_servername(self):

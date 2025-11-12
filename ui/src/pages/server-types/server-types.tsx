@@ -133,6 +133,7 @@ export const ServerTypes = (): React.ReactElement => {
           groups: currentFormInput?.share_with?.groups || [],
         },
         keep_alive: currentFormInput?.keep_alive || false,
+        skip_conda: currentFormInput?.framework === 'custom',
         repository: currentFormInput?.repository || undefined,
       },
     };

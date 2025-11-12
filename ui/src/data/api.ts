@@ -4,7 +4,7 @@ import {
   AppQueryGetProps,
 } from '@src/types/api';
 import { JhApp } from '@src/types/jupyterhub';
-import { UserState } from '@src/types/user';
+import { UserServer, UserState } from '@src/types/user';
 import { DEFAULT_APP_LOGO } from './logos';
 
 const currentDate = new Date();
@@ -344,7 +344,7 @@ export const userState: UserState = {
   roles: ['role1', 'role2'],
   scopes: ['scope1', 'scope2'],
   server: null,
-  servers: [app],
+  servers: { 'app-1': app as UserServer },
   session_id: null,
   share_permissions: {
     users: ['admin'],

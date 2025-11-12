@@ -16,6 +16,10 @@ from jhub_apps.spawner.types import Framework
 API_URL = os.environ.get("JUPYTERHUB_API_URL")
 JUPYTERHUB_API_TOKEN = os.environ.get("JUPYTERHUB_API_TOKEN")
 
+# Default timeout for requests to JupyterHub API (seconds)
+# Can be overridden with JUPYTERHUB_REQUEST_TIMEOUT env variable
+DEFAULT_REQUEST_TIMEOUT = int(os.environ.get("JUPYTERHUB_REQUEST_TIMEOUT", "30"))
+
 logger = structlog.get_logger(__name__)
 
 
@@ -68,7 +72,8 @@ class HubClient:
             json={
                 # Expire in 5 minutes max
                 "expires_in": 60*5
-            }
+            },
+            timeout=DEFAULT_REQUEST_TIMEOUT
         )
         r.raise_for_status()
         rjson = r.json()
@@ -89,6 +94,7 @@ class HubClient:
         r = requests.delete(
             API_URL + f"/users/{self.username}/tokens/{token_id}",
             headers=self._headers(token=JUPYTERHUB_API_TOKEN),
+            timeout=DEFAULT_REQUEST_TIMEOUT
         )
         r.raise_for_status()
         logger.debug(
@@ -104,7 +110,8 @@ class HubClient:
             API_URL + "/users",
             params={"include_stopped_servers": True},
             # We explicitly want to use japps app token for this
-            headers=self._headers(token=self.tokens[0])
+            headers=self._headers(token=self.tokens[0]),
+            timeout=DEFAULT_REQUEST_TIMEOUT
         )
         r.raise_for_status()
         users = r.json()
@@ -115,7 +122,8 @@ class HubClient:
         r = requests.get(
             API_URL + f"/users/{user or self.username}",
             params={"include_stopped_servers": True},
-            headers=self._headers()
+            headers=self._headers(),
+            timeout=DEFAULT_REQUEST_TIMEOUT
         )
         r.raise_for_status()
         user = r.json()
@@ -168,7 +176,7 @@ class HubClient:
             user_options = server["user_options"]
         url = f"/users/{server_owner}/servers/{servername}"
         data = {"name": servername, **user_options}
-        response = requests.post(API_URL + url, headers=self._headers(), json=data)
+        response = requests.post(API_URL + url, headers=self._headers(), json=data, timeout=DEFAULT_REQUEST_TIMEOUT)
         logger.info("Start server response", status_code=response.status_code, servername=servername)
         return response
 
@@ -207,7 +215,7 @@ class HubClient:
         params = user_options.model_dump()
         data = {"name": servername, **params}
         logger.info("Creating new server", server_name=servername)
-        r = requests.post(API_URL + url, headers=self._headers(), json=data)
+        r = requests.post(API_URL + url, headers=self._headers(), json=data, timeout=DEFAULT_REQUEST_TIMEOUT)
         r.raise_for_status()
         if user_options.framework != Framework.jupyterlab.value:
             if is_jupyterhub_5():
@@ -243,7 +251,8 @@ class HubClient:
         return requests.post(
             API_URL + url,
             headers=self._headers(),
-            json=data
+            json=data,
+            timeout=DEFAULT_REQUEST_TIMEOUT
         )
 
     def _share_server_with_multiple_entities(
@@ -291,7 +300,7 @@ class HubClient:
         """Revoke all shared access to a given server"""
         logger.info("Revoking shared servers access", user=username, servername=servername)
         url = f"/shares/{username}/{servername}"
-        return requests.delete(API_URL + url, headers=self._headers())
+        return requests.delete(API_URL + url, headers=self._headers(), timeout=DEFAULT_REQUEST_TIMEOUT)
 
     @requires_user_token
     def get_shared_servers(self, username: str = None):
@@ -302,7 +311,7 @@ class HubClient:
             return []
         logger.info("Getting shared servers", user=username)
         url = f"/users/{username}/shared"
-        response = requests.get(API_URL + url, headers=self._headers())
+        response = requests.get(API_URL + url, headers=self._headers(), timeout=DEFAULT_REQUEST_TIMEOUT)
         rjson = response.json()
         shared_servers = rjson["items"]
         return shared_servers
@@ -315,19 +324,19 @@ class HubClient:
         url = f"/users/{username}/servers/{server_name}"
         # This will remove it from the database, otherwise it will just stop the server
         params = {"remove": remove}
-        r = requests.delete(API_URL + url, headers=self._headers(), json=params)
+        r = requests.delete(API_URL + url, headers=self._headers(), json=params, timeout=DEFAULT_REQUEST_TIMEOUT)
         r.raise_for_status()
         return r.status_code
 
     @requires_user_token
     def get_services(self):
-        r = requests.get(API_URL + "/services", headers=self._headers())
+        r = requests.get(API_URL + "/services", headers=self._headers(), timeout=DEFAULT_REQUEST_TIMEOUT)
         r.raise_for_status()
         return r.json()
 
     def get_groups(self):
         """Returns all the groups in JupyterHub"""
-        r = requests.get(API_URL + "/groups", headers=self._headers())
+        r = requests.get(API_URL + "/groups", headers=self._headers(), timeout=DEFAULT_REQUEST_TIMEOUT)
         r.raise_for_status()
         return r.json()
 

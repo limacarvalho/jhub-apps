@@ -1,6 +1,17 @@
-import { SharePermissions } from './api';
+import { SharePermissions, UserOptions } from './api';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface UserServer {
+  name: string;
+  last_activity: string;
+  started: string;
+  pending: boolean | null;
+  ready: boolean;
+  stopped: boolean;
+  url: string;
+  user_options: UserOptions | Record<string, unknown>;
+  progress_url: string;
+}
+
 export interface UserState {
   username: string | undefined;
   admin: boolean;
@@ -14,7 +25,7 @@ export interface UserState {
   roles: string[];
   scopes: string[];
   server: string | null;
-  servers: any;
+  servers: Record<string, UserServer>;
   session_id: string | null;
   share_permissions: SharePermissions;
 }

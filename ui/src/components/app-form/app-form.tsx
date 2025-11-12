@@ -73,7 +73,6 @@ export const AppForm = ({
   const [searchParams] = useSearchParams();
   const fullText = 'Validating URL...';
   const [displayedText, setDisplayedText] = useState('');
-  const [index, setIndex] = useState(0);
 
   const initialFilepath = decodeURIComponent(
     searchParams.get('filepath') || '',
@@ -83,6 +82,7 @@ export const AppForm = ({
   const [isFetching, setIsFetching] = useState<boolean>(false); // For loading state
   const [isProcessing, setIsProcessing] = useState(false);
   const [openModal, setOpenModal] = useState(false); // State to control modal visibility
+  const [showCustomCommandDialog, setShowCustomCommandDialog] = useState(false); // State for custom command guidance dialog
 
   const [repoData, setRepoData] = useState<RepoData | null>(null); // Store fetched repo data
   const [customRef, setCustomRef] = useState('');
@@ -389,6 +389,13 @@ export const AppForm = ({
 
   const currentFramework = watch('framework');
 
+  // Show custom command dialog when framework changes to 'custom'
+  useEffect(() => {
+    if (currentFramework === 'custom') {
+      setShowCustomCommandDialog(true);
+    }
+  }, [currentFramework]);
+
   useEffect(() => {
     const currentTextAreaRef = textAreaRef.current;
     const syncScroll = () => {
@@ -419,9 +426,10 @@ export const AppForm = ({
   useEffect(() => {
     // Only start the animation if the URL is still being validated and not yet valid
     if (isFetching && !isUrlValid) {
+      let localIndex = 0;
       const interval = setInterval(() => {
-        setDisplayedText(fullText.substring(0, index + 1)); // Slice the text to progressively reveal
-        setIndex((prevIndex) => (prevIndex + 1) % fullText.length); // Loop back to 0 when reaching end
+        localIndex = (localIndex + 1) % fullText.length;
+        setDisplayedText(fullText.substring(0, localIndex + 1));
       }, 150); // Adjust speed here
 
       // Clear interval on unmount or `isFetching` change
@@ -429,9 +437,8 @@ export const AppForm = ({
     } else {
       // Reset the animation state when validation is complete
       setDisplayedText('');
-      setIndex(0);
     }
-  }, [index, isFetching, isUrlValid]);
+  }, [isFetching, isUrlValid, fullText]);
 
   const onFormSubmit: SubmitHandler<AppFormInput> = ({
     display_name,
@@ -465,6 +472,7 @@ export const AppForm = ({
           groups: currentGroupPermissions,
         },
         keep_alive: keepAlive,
+        skip_conda: framework === 'custom',
         repository:
           deployOption === 'git'
             ? {
@@ -498,6 +506,7 @@ export const AppForm = ({
             groups: currentGroupPermissions,
           },
           keep_alive: keepAlive,
+          skip_conda: framework === 'custom',
           repository:
             deployOption === 'git'
               ? {
@@ -589,8 +598,13 @@ export const AppForm = ({
   const { mutate: createQuery } = useMutation({
     mutationFn: createRequest,
     retry: 1,
-    // eslint-disable-next-line no-console
-    onError: (error) => console.error('Create request error:', error),
+    onError: (error) => {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'An error occurred while creating the app';
+      setNotification(errorMessage);
+    },
   });
 
   const { mutate: updateQuery } = useMutation({
@@ -1204,7 +1218,9 @@ export const AppForm = ({
           ) : (
             <></>
           )}
-          {environments && environments.length > 0 ? (
+          {environments &&
+          environments.length > 0 &&
+          currentFramework !== 'custom' ? (
             <Controller
               name="conda_env"
               control={control}
@@ -1286,22 +1302,24 @@ export const AppForm = ({
           ) : (
             <></>
           )}
-          <Controller
-            name="filepath"
-            control={control}
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            render={({ field: { ref, ...field } }) => (
-              <FormControl>
-                <TextField
-                  {...field}
-                  id="filepath"
-                  label="File path"
-                  placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
-                  error={!!errors.filepath}
-                />
-              </FormControl>
-            )}
-          />
+          {currentFramework !== 'custom' && (
+            <Controller
+              name="filepath"
+              control={control}
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              render={({ field: { ref, ...field } }) => (
+                <FormControl>
+                  <TextField
+                    {...field}
+                    id="filepath"
+                    label="File path"
+                    placeholder='Enter the path to the file, e.g. "/shared/users/panel_basic.py"'
+                    error={!!errors.filepath}
+                  />
+                </FormControl>
+              )}
+            />
+          )}
           <Box
             sx={{
               display: 'flex',
@@ -1451,6 +1469,73 @@ export const AppForm = ({
           <DialogActions>
             <Button onClick={() => setOpenModal(false)} color="primary">
               Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog
+          open={showCustomCommandDialog}
+          onClose={() => setShowCustomCommandDialog(false)}
+          maxWidth="sm"
+        >
+          <DialogTitle>Custom Command Guidelines</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              Custom commands support all shell features including pipes,
+              redirects, environment variables, and built-in commands like cd.
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Use <code>{'{port}'}</code> to specify where your
+              application should listen for connections. Specify and replace in your command the regular TCP port with the <code>{'{port}'}</code>. Port assignment is automatic.
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+              Examples:
+            </Typography>
+            <Typography
+              variant="body2"
+              component="pre"
+              sx={{
+                backgroundColor: '#f5f5f5',
+                padding: 2,
+                borderRadius: 1,
+                overflowX: 'auto',
+                mb: 1,
+              }}
+            >
+              cd /home/YourUserName/testapp && uv run streamlit run app.py --server.port {'{port}'}{' '}
+            </Typography>
+            <Typography
+              variant="body2"
+              component="pre"
+              sx={{
+                backgroundColor: '#f5f5f5',
+                padding: 2,
+                borderRadius: 1,
+                overflowX: 'auto',
+                mb: 1,
+              }}
+            >
+              cd /home/YourUserName/testapp && python3 -m http.server {'{port}'}
+            </Typography>
+            <Typography
+              variant="body2"
+              component="pre"
+              sx={{
+                backgroundColor: '#f5f5f5',
+                padding: 2,
+                borderRadius: 1,
+                overflowX: 'auto',
+              }}
+            >
+              cd /home/YourUserName/testapp && uvicorn main:app --host 0.0.0.0 --port {'{port}'} | tee app.log
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setShowCustomCommandDialog(false)}
+              color="primary"
+              variant="contained"
+            >
+              Got it
             </Button>
           </DialogActions>
         </Dialog>

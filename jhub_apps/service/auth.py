@@ -1,7 +1,7 @@
 import structlog
 import os
 import typing
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 import jwt
 from fastapi import HTTPException, status
@@ -13,9 +13,9 @@ def _create_access_token(data: dict, expires_delta: typing.Optional[timedelta] =
     logger.info("Creating access token")
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     secret_key = os.environ["JHUB_APP_JWT_SECRET_KEY"]
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm="HS256")

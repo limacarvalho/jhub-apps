@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from jhub_apps.service.japps_routes import router as japps_router
@@ -47,6 +48,32 @@ try:
         # swagger_ui_oauth2_redirect_url=os.environ["JUPYTERHUB_OAUTH_CALLBACK_URL"],
     )
     logger.info("FastAPI application created successfully")
+
+    # Configure CORS (optional, disabled by default to avoid WebSocket issues)
+    # Set ENABLE_CORS=true environment variable to enable
+    enable_cors = os.environ.get("ENABLE_CORS", "false").lower() == "true"
+
+    if enable_cors:
+        public_host = os.environ.get("PUBLIC_HOST", "http://localhost:8000")
+        allowed_origins = [public_host]
+
+        # Allow additional origins from environment variable if specified
+        additional_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+        if additional_origins:
+            allowed_origins.extend([origin.strip() for origin in additional_origins.split(",")])
+
+        logger.info("Configuring CORS", allowed_origins=allowed_origins)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["*"],
+        )
+        logger.info("CORS middleware enabled")
+    else:
+        logger.info("CORS middleware disabled (set ENABLE_CORS=true to enable)")
 
     logger.info("Mounting static files", static_dir=str(STATIC_DIR), prefix=f"{router.prefix}/static")
     static_files = StaticFiles(directory=STATIC_DIR)

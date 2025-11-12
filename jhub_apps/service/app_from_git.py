@@ -1,7 +1,9 @@
 import os
 import pathlib
+import re
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import git
 from fastapi import HTTPException, status
@@ -11,18 +13,85 @@ from jhub_apps.service.models import Repository, JHubAppConfig
 from jhub_apps.service.utils import logger, encode_file_to_data_url
 
 
+def _validate_git_repository(repository: Repository):
+    """Validate git repository URL and ref to prevent command injection"""
+    # Validate URL scheme
+    parsed_url = urlparse(repository.url)
+    allowed_schemes = ['https', 'http', 'git', 'ssh']
+    if parsed_url.scheme not in allowed_schemes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid URL scheme. Only {', '.join(allowed_schemes)} protocols are allowed."
+        )
+
+    # Validate URL format - basic checks to prevent command injection
+    if any(char in repository.url for char in [';', '|', '&', '$', '`', '\n', '\r']):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid characters in repository URL"
+        )
+
+    # Validate branch/ref name to prevent command injection
+    if repository.ref:
+        # Allow alphanumeric, dots, hyphens, underscores, and forward slashes
+        if not re.match(r'^[\w\-./ ]+$', repository.ref):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid branch or ref name. Only alphanumeric characters, dots, hyphens, underscores, and slashes are allowed."
+            )
+
+        # Prevent dangerous patterns
+        if any(pattern in repository.ref for pattern in [';', '|', '&', '$', '`', '../', '\n', '\r']):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid characters in branch or ref name"
+            )
+
+
 def _clone_repo(repository: Repository, temp_dir):
     """Clone repository to the given tem_dir"""
+    # Validate repository before cloning
+    _validate_git_repository(repository)
+
     try:
         logger.info("Trying to clone repository", repo_url=repository.url)
         git.Repo.clone_from(repository.url, temp_dir, depth=1, branch=repository.ref)
-    except Exception as e:
-        message = f"Repository clone failed: {repository.url}"
-        logger.error(message, repo_url=repository.url)
-        logger.error(e)
+    except git.exc.GitCommandError as e:
+        error_msg = str(e)
+        logger.error("Git command failed", repo_url=repository.url, error=error_msg)
+
+        # Provide specific error messages for common issues
+        if "Authentication failed" in error_msg or "fatal: could not read" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Git authentication failed. Please check your credentials."
+            )
+        elif "Repository not found" in error_msg or "does not exist" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Repository not found: {repository.url}"
+            )
+        elif repository.ref and ("unknown revision" in error_msg or "not found" in error_msg):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Branch or ref '{repository.ref}' not found in repository"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to clone repository. Please verify the repository URL is correct."
+            )
+    except (TimeoutError, git.exc.GitError) as e:
+        logger.error("Git operation failed", repo_url=repository.url, error=str(e))
         raise HTTPException(
-            detail=message,
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Git clone operation timed out. The repository may be too large or the server is unreachable."
+        )
+    except Exception as e:
+        logger.error("Unexpected error cloning repository", repo_url=repository.url, error=str(e), error_type=type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while cloning the repository."
         )
 
 

@@ -20,6 +20,7 @@ export interface AppFormInput {
   profile_image?: string;
   thumbnail?: string;
   share_with: SharePermissions;
+  skip_conda?: boolean;
   repository?: {
     url: string;
     config_directory?: string; //conda_project_yml

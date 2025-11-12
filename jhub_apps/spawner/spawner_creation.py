@@ -19,7 +19,7 @@ from jhub_apps.spawner.env import parse_proxy_args_from_env, merge_proxy_args
 logger = structlog.get_logger(__name__)
 
 # jhub-app-proxy configuration
-JHUB_APP_PROXY_INSTALL_URL = "https://raw.githubusercontent.com/nebari-dev/jhub-app-proxy/main/install.sh"
+JHUB_APP_PROXY_INSTALL_URL = "https://raw.githubusercontent.com/limacarvalho/jhub-app-proxy/main/install.sh"
 
 
 def get_proxy_version(config, app_env=None):
@@ -59,10 +59,25 @@ def wrap_command_with_proxy_installer(cmd_list, proxy_version):
 # Ensure ~/.local/bin and /tmp/.local/bin are in PATH
 export PATH="$HOME/.local/bin:/tmp/.local/bin:$PATH"
 
-# Install jhub-app-proxy (overrides if already present)
-echo "Installing jhub-app-proxy version {proxy_version}..."
-echo "Running: curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin"
-curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin
+# Check if jhub-app-proxy is already installed locally
+if command -v jhub-app-proxy &> /dev/null; then
+    INSTALLED_VERSION=$(jhub-app-proxy --version 2>&1 | head -n1 || echo "unknown")
+    echo "Found local jhub-app-proxy: $INSTALLED_VERSION"
+
+    # Check if it's the correct version (or a custom build with matching version tag)
+    if echo "$INSTALLED_VERSION" | grep -q "{proxy_version}"; then
+        echo "Using local jhub-app-proxy (version matches: {proxy_version})"
+    else
+        echo "Local version does not match {proxy_version}, will download from GitHub"
+        echo "Running: curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin"
+        curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin
+    fi
+else
+    # No local binary found, download from GitHub
+    echo "Installing jhub-app-proxy version {proxy_version}..."
+    echo "Running: curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin"
+    curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin
+fi
 
 # Execute the original command
 echo "Running command: {cmd_str}"
@@ -103,13 +118,29 @@ def subclass_spawner(base_spawner):
                 self.user_options["filepath"] = str(app_filepath)
 
             custom_cmd = self.user_options.get("custom_command")
+            skip_conda = self.user_options.get("skip_conda", False)
             if framework == Framework.custom.value:
                 assert custom_cmd
-                # Custom commands can be any executable - use the command as-is
-                command = Command(args=[
-                    TString("--conda-env=$conda_env"),
+                # Custom commands support jhub-app-proxy placeholders: {port}, {-}, {--}
+                # These MUST be separate arguments for jhub-app-proxy to process them
+                # Solution: Use /bin/sh {-}c so jhub-app-proxy expands {-} to -
+                # This keeps the entire command visible for placeholder replacement
+                command_args = []
+
+                # Only add conda-env if not explicitly skipped
+                if not skip_conda and self.user_options.get("conda_env"):
+                    command_args.append(TString("--conda-env=$conda_env"))
+
+                # Use sh -c with {-} placeholder (expands to -)
+                # This way the command string is visible to jhub-app-proxy
+                # and it can replace {port} before sh executes it
+                command_args.extend([
                     "--",
-                ] + custom_cmd.split())
+                    "/bin/sh",
+                    "{-}c",  # jhub-app-proxy will expand this to -c
+                    custom_cmd  # Command with {port} intact for jhub-app-proxy to replace
+                ])
+                command = Command(args=command_args)
             else:
                 command: Command = COMMANDS.get(framework)
 
@@ -196,10 +227,10 @@ def subclass_spawner(base_spawner):
                         app=self.user_options.get("display_name"),
                         framework=self.user_options.get("framework")
                     )
-                    base_cmd.append("--keep-alive=true")
+                    base_cmd.append("--force-alive=true")
                 else:
                     # Default behavior: report actual activity (allow idle culling)
-                    base_cmd.append("--keep-alive=false")
+                    base_cmd.append("--force-alive=false")
 
                 # Add git repository arguments to base_cmd (before -- separator)
                 repository = self.user_options.get("repository")
