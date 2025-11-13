@@ -1484,8 +1484,10 @@ export const AppForm = ({
               redirects, environment variables, and built-in commands like cd.
             </Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              Use <code>{'{port}'}</code> to specify where your
-              application should listen for connections. Specify and replace in your command the regular TCP port with the <code>{'{port}'}</code>. Port assignment is automatic.
+              Use <code>{'{port}'}</code> to specify where your application
+              should listen for connections. Specify and replace in your command
+              the regular TCP port with the <code>{'{port}'}</code>. Port
+              assignment is automatic.
             </Typography>
             <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
               Examples:
@@ -1501,7 +1503,8 @@ export const AppForm = ({
                 mb: 1,
               }}
             >
-              cd /home/YourUserName/testapp && uv run streamlit run app.py --server.port {'{port}'}{' '}
+              cd /home/YourUserName/testapp && uv run streamlit run app.py
+              --server.port {'{port}'}
             </Typography>
             <Typography
               variant="body2"
@@ -1526,7 +1529,8 @@ export const AppForm = ({
                 overflowX: 'auto',
               }}
             >
-              cd /home/YourUserName/testapp && uvicorn main:app --host 0.0.0.0 --port {'{port}'} | tee app.log
+              cd /home/YourUserName/testapp && uvicorn main:app --host 0.0.0.0
+              --port {'{port}'} | tee app.log
             </Typography>
           </DialogContent>
           <DialogActions>
