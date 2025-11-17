@@ -1,5 +1,9 @@
+import os
 import shlex
+import sys
 import uuid
+from pathlib import Path
+from typing import Optional
 
 import structlog
 
@@ -21,6 +25,24 @@ logger = structlog.get_logger(__name__)
 # jhub-app-proxy configuration
 JHUB_APP_PROXY_INSTALL_URL = "https://raw.githubusercontent.com/limacarvalho/jhub-app-proxy/main/install.sh"
 
+
+def find_conda_dir_compact(search_string: str, parent_dir: str = "/home/conda") -> Optional[str]:
+    """Compact version using next() with generator expression."""
+    username, _, subdir = search_string.partition("-")
+    user_path = Path(parent_dir) / username
+
+    try:
+        return next(
+            (
+                entry.path
+                for entry in os.scandir(user_path)
+                if entry.is_dir(follow_symlinks=False) and subdir in entry.name
+            ),
+            None,
+        )
+    except (PermissionError, FileNotFoundError):
+        return None
+    
 
 def get_proxy_version(config, app_env=None):
     """Get jhub-app-proxy version from app environment or config.
@@ -58,6 +80,7 @@ def wrap_command_with_proxy_installer(cmd_list, proxy_version):
     install_script = f'''
 # Ensure ~/.local/bin and /tmp/.local/bin are in PATH
 export PATH="$HOME/.local/bin:/tmp/.local/bin:$PATH"
+mkdir -p /tmp/.local/bin/
 
 # Check if jhub-app-proxy is already installed locally
 if command -v jhub-app-proxy &> /dev/null; then
@@ -71,12 +94,14 @@ if command -v jhub-app-proxy &> /dev/null; then
         echo "Local version does not match {proxy_version}, will download from GitHub"
         echo "Running: curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin"
         curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin
+        chmod +x /tmp/.local/bin/jhub-app-proxy
     fi
 else
     # No local binary found, download from GitHub
     echo "Installing jhub-app-proxy version {proxy_version}..."
     echo "Running: curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin"
     curl -fsSL {JHUB_APP_PROXY_INSTALL_URL} | bash -s -- -v {proxy_version} -d /tmp/.local/bin
+    chmod +x /tmp/.local/bin/jhub-app-proxy
 fi
 
 # Execute the original command
@@ -129,7 +154,8 @@ def subclass_spawner(base_spawner):
 
                 # Only add conda-env if not explicitly skipped
                 if not skip_conda and self.user_options.get("conda_env"):
-                    command_args.append(TString("--conda-env=$conda_env"))
+                    conda_env_full_path = find_conda_dir_compact(self.user_options.get("conda_env"))
+                    command_args.append(TString(f"--conda-env={conda_env_full_path}"))
 
                 # Use sh -c with {-} placeholder (expands to -)
                 # This way the command string is visible to jhub-app-proxy
@@ -144,6 +170,14 @@ def subclass_spawner(base_spawner):
             else:
                 command: Command = COMMANDS.get(framework)
 
+            conda_env = self.user_options.get("conda_env", "")
+            if conda_env:
+                conda_env_full_path = find_conda_dir_compact(conda_env)
+                if conda_env_full_path:
+                    conda_env = conda_env_full_path
+                else:
+                    logger.warning(f"Conda env '{conda_env}' not found in /home/conda, using original value")
+
             command_args = command.get_substituted_args(
                 python_exec=self.config.JAppsConfig.python_exec,
                 filepath=app_filepath,
@@ -152,7 +186,7 @@ def subclass_spawner(base_spawner):
                 jh_service_prefix=jh_service_prefix,
                 jh_service_prefixlab=f"{jh_service_prefix}lab",
                 voila_base_url=f"{jh_service_prefix}",
-                conda_env=self.user_options.get("conda_env", ""),
+                conda_env=conda_env
             )
             return command_args
 
